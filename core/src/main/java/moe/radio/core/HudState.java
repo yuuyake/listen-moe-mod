@@ -18,7 +18,7 @@ public final class HudState {
 
     private HudState() {}
 
-    /** Text for the HUD, or null if nothing should be drawn. */
+    /** Text for the HUD or null if nothing needs to be drawn. */
     public static String line() {
         if (!enabled || !RadioPlayer.isPlaying()) return null;
         return "\u266A " + NowPlaying.get();
