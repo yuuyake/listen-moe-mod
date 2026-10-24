@@ -34,8 +34,14 @@ public final class HudState {
         return (RadioPlayer.isPlaying() || RadioPlayer.isPaused()) ? NowPlaying.get() : "Name - Artist";
     }
 
+    public static boolean coverVisible() {
+        if (!showCover) return false;
+        boolean idle = !(RadioPlayer.isPlaying() || RadioPlayer.isPaused());
+        return idle || NowPlaying.coverState() != NowPlaying.COVER_NONE;
+    }
+
     public static int height() {
-        int body = Math.max(showCover ? 44 : 0, showButtons ? 38 : 10);
+        int body = Math.max(coverVisible() ? 44 : 0, showButtons ? 38 : 10);
         return 8 + body + (showProgress ? 20 : 8);
     }
 

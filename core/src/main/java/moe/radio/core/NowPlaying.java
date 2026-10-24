@@ -18,6 +18,7 @@ import org.java_websocket.handshake.ServerHandshake;
 
 public final class NowPlaying {
     public static final int COVER_SIZE = 64;
+    public static final int COVER_NONE = 0, COVER_LOADING = 1, COVER_READY = 2;
 
     public static final class Track {
         public final String title, artist;
@@ -33,9 +34,12 @@ public final class NowPlaying {
     private static volatile Track track;
     private static volatile int[] coverPixels;
     private static volatile int coverVersion;
+    private static volatile int coverState = COVER_LOADING;
+    private static volatile boolean coverInit;
     private static volatile int seq;
     private static volatile String lastCoverUrl;
     private static volatile long clockOffset;
+    private static volatile String lastRaw = "";
     private static WebSocketClient ws;
     private static Timer timer;
 
@@ -69,21 +73,29 @@ public final class NowPlaying {
         if (t == null) return "Loading...";
         StringBuilder sb = new StringBuilder(get());
         sb.append(" (").append(fmt(elapsedSec())).append(" / ").append(fmt(t.durationSec)).append(")");
-        if (!t.startKnown) sb.append(" [no start time]");
+        if (!t.startKnown) sb.append(" [no usable start time]");
         if (t.durationSec <= 0) sb.append(" [no duration]");
         return sb.toString();
+    }
+
+    public static String lastRaw() {
+        String r = lastRaw;
+        if (r.isEmpty()) return "no track message received yet";
+        return r.length() > 400 ? r.substring(0, 400) : r;
     }
 
     private static String fmt(int s) { return (s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60); }
 
     public static int coverVersion() { return coverVersion; }
+    public static int coverState() { return coverState; }
     public static int[] coverPixels() { return coverPixels; }
 
     static synchronized void connect(boolean kpop) {
         disconnect();
         track = null;
         lastCoverUrl = null;
-        setCover(null, ++seq);
+        coverInit = false;
+        setCover(null, ++seq, COVER_LOADING);
         try {
             URI uri = new URI(kpop ? "wss://listen.moe/kpop/gateway_v2" : "wss://listen.moe/gateway_v2");
             ws = new WebSocketClient(uri) {
@@ -114,7 +126,8 @@ public final class NowPlaying {
                         public void run() { WebSocketClient w = ws; if (w != null && w.isOpen()) w.send("{\"op\":9}"); }
                     }, 0, hb);
                 }
-            } else if (op == 1 && isTrackEvent(o) && o.has("d") && o.getAsJsonObject("d").has("song")) {
+            } else if (op == 1 && o.has("d") && o.get("d").isJsonObject() && o.getAsJsonObject("d").has("song")) {
+                lastRaw = msg;
                 JsonObject d = o.getAsJsonObject("d");
                 JsonObject song = d.getAsJsonObject("song");
                 String title = str(song, "title");
@@ -130,28 +143,32 @@ public final class NowPlaying {
                 }
                 int dur = 0;
                 JsonElement de = song.get("duration");
-                if (de != null && !de.isJsonNull()) dur = de.getAsInt();
+                if (de != null && !de.isJsonNull()) {
+                    try { dur = (int) Math.round(Double.parseDouble(de.getAsString())); } catch (Exception ignored) {}
+                }
+                long arrival = now();
                 long start = 0;
                 boolean known = false;
                 String st = str(d, "startTime");
                 if (st != null) {
                     try { start = OffsetDateTime.parse(st).toInstant().toEpochMilli(); known = true; } catch (Exception ignored) {}
                 }
-                if (!known) start = now();
+                if (known && dur > 0) {
+                    long el = arrival - start;
+                    if (el < -3000 || el > dur * 1000L + 3000) known = false;
+                }
+                if (!known) start = arrival;
                 track = new Track(title == null ? "unknown" : title, sb.toString(), start, known, dur);
 
                 String cover = coverUrl(song);
-                if (cover == null ? lastCoverUrl != null : !cover.equals(lastCoverUrl)) {
+                boolean changed = !coverInit || (cover == null ? lastCoverUrl != null : !cover.equals(lastCoverUrl));
+                if (changed) {
+                    coverInit = true;
                     lastCoverUrl = cover;
                     loadCover(cover, ++seq);
                 }
             }
         } catch (Exception ignored) {}
-    }
-
-    private static boolean isTrackEvent(JsonObject o) {
-        String t = str(o, "t");
-        return t == null || t.startsWith("TRACK_UPDATE");
     }
 
     private static String str(JsonObject o, String k) {
@@ -179,21 +196,23 @@ public final class NowPlaying {
     }
 
     private static void loadCover(final String url, final int my) {
-        if (url == null) { setCover(null, my); return; }
+        if (url == null) { setCover(null, my, COVER_NONE); return; }
+        setCover(null, my, COVER_LOADING);
         Thread t = new Thread(new Runnable() {
             public void run() {
                 int[] px = null;
                 try { px = fetch(url); } catch (Exception ignored) {}
-                setCover(px, my);
+                setCover(px, my, px != null ? COVER_READY : COVER_NONE);
             }
         }, "listenmoe-cover");
         t.setDaemon(true);
         t.start();
     }
 
-    private static synchronized void setCover(int[] px, int my) {
+    private static synchronized void setCover(int[] px, int my, int state) {
         if (my != seq) return;
         coverPixels = px;
+        coverState = state;
         coverVersion++;
     }
 

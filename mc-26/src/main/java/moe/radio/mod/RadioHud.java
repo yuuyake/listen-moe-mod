@@ -10,6 +10,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.resources.Identifier;
+import org.lwjgl.glfw.GLFW;
 
 final class RadioHud {
     private static final int ART = 44;
@@ -44,7 +45,10 @@ final class RadioHud {
         double mx = mc.mouseHandler.xpos() * win.getGuiScaledWidth() / (double) win.getScreenWidth();
         double my = mc.mouseHandler.ypos() * win.getGuiScaledHeight() / (double) win.getScreenHeight();
         int x = HudState.x(sw), y = HudState.y(sh), w = HudState.scaledW(), h = HudState.scaledH();
-        boolean down = mc.mouseHandler.isLeftPressed();
+        long handle = GLFW.glfwGetCurrentContext();
+        boolean down = handle != 0
+            ? GLFW.glfwGetMouseButton(handle, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS
+            : mc.mouseHandler.isLeftPressed();
         if (down && !wasDown) {
             if (mx >= x + w - 10 && mx < x + w && my >= y + h - 10 && my < y + h) {
                 resizing = true;
@@ -90,7 +94,7 @@ final class RadioHud {
         g.fill(0, 0, w, h, 0xB0181818);
 
         int tx = 8;
-        if (HudState.showCover) {
+        if (HudState.coverVisible()) {
             if (!RadioCover.draw(g, 8, 8, ART)) g.fill(8, 8, 8 + ART, 8 + ART, 0xFF000000);
             tx = 8 + ART + 10;
         }

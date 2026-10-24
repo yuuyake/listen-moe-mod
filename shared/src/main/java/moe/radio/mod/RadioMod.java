@@ -69,6 +69,7 @@ public class RadioMod implements ClientModInitializer {
                 .then(literal("stop").executes(c -> { RadioPlayer.stop(); return msg(c, "Radio stopped"); }))
                 .then(hud)
                 .then(literal("np").executes(c -> msg(c, "Now playing: " + NowPlaying.describe())))
+                .then(literal("raw").executes(c -> msg(c, NowPlaying.lastRaw())))
                 .then(literal("volume")
                     .executes(c -> msg(c, "Volume: " + RadioPlayer.getVolume()))
                     .then(argument("percent", IntegerArgumentType.integer(0, 100)).executes(c -> {
