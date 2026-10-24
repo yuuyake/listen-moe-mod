@@ -8,7 +8,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.Identifier;
 
-/**Toggle with /radio hud */
+/**radio hud */
 final class RadioHud {
     private RadioHud() {}
 
