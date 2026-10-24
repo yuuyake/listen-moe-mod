@@ -16,7 +16,7 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.network.chat.Component;
 
-/** Used for 1.21.x and 26.x (Mojang mappings). */
+/** Mojang mappings */
 public class RadioMod implements ClientModInitializer {
     private static Path cfg;
 
