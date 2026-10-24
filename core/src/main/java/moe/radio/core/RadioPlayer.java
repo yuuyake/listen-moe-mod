@@ -12,7 +12,7 @@ import javazoom.jl.decoder.Decoder;
 import javazoom.jl.decoder.Header;
 import javazoom.jl.decoder.SampleBuffer;
 
-/** Streams MP3 from listen.moe and plays it locally. No Minecraft dependencies. */
+/** Streams the song (MP3) from listen.moe and plays it locally. */
 public final class RadioPlayer {
     public static final String JPOP = "https://listen.moe/fallback";
     public static final String KPOP = "https://listen.moe/kpop/fallback";
