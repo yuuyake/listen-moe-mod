@@ -91,7 +91,10 @@ public final class RadioPlayer {
         c.setRequestProperty("User-Agent", "listenmoe-fabric/1.0");
         c.setConnectTimeout(10000);
         c.setReadTimeout(15000);
-        return new BufferedInputStream(c.getInputStream(), 65536);
+        InputStream raw = c.getInputStream();
+        long date = c.getDate();
+        if (date > 0) NowPlaying.calibrate(date - System.currentTimeMillis());
+        return new BufferedInputStream(raw, 65536);
     }
 
     private static void decode(InputStream in, int g) throws Exception {

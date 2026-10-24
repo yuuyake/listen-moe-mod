@@ -9,7 +9,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
-import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.Timer;
 import java.util.TimerTask;
 import javax.imageio.ImageIO;
@@ -22,9 +22,11 @@ public final class NowPlaying {
     public static final class Track {
         public final String title, artist;
         public final long startMs;
+        public final boolean startKnown;
         public final int durationSec;
-        Track(String title, String artist, long startMs, int durationSec) {
-            this.title = title; this.artist = artist; this.startMs = startMs; this.durationSec = durationSec;
+        Track(String title, String artist, long startMs, boolean startKnown, int durationSec) {
+            this.title = title; this.artist = artist; this.startMs = startMs;
+            this.startKnown = startKnown; this.durationSec = durationSec;
         }
     }
 
@@ -33,6 +35,7 @@ public final class NowPlaying {
     private static volatile int coverVersion;
     private static volatile int seq;
     private static volatile String lastCoverUrl;
+    private static volatile long clockOffset;
     private static WebSocketClient ws;
     private static Timer timer;
 
@@ -46,14 +49,32 @@ public final class NowPlaying {
 
     public static int durationSec() { Track t = track; return t == null ? 0 : t.durationSec; }
 
-    public static int elapsedSec() {
+    static void calibrate(long offset) { clockOffset = offset; }
+
+    private static long now() { return System.currentTimeMillis() + clockOffset; }
+
+    public static long elapsedMs() {
         Track t = track;
-        if (t == null || t.startMs <= 0) return 0;
-        long s = (System.currentTimeMillis() - t.startMs) / 1000;
-        if (s < 0) s = 0;
-        if (t.durationSec > 0 && s > t.durationSec) s = t.durationSec;
-        return (int) s;
+        if (t == null) return 0;
+        long ms = now() - t.startMs;
+        if (ms < 0) ms = 0;
+        if (t.durationSec > 0 && ms > t.durationSec * 1000L) ms = t.durationSec * 1000L;
+        return ms;
     }
+
+    public static int elapsedSec() { return (int) (elapsedMs() / 1000); }
+
+    public static String describe() {
+        Track t = track;
+        if (t == null) return "Loading...";
+        StringBuilder sb = new StringBuilder(get());
+        sb.append(" (").append(fmt(elapsedSec())).append(" / ").append(fmt(t.durationSec)).append(")");
+        if (!t.startKnown) sb.append(" [no start time]");
+        if (t.durationSec <= 0) sb.append(" [no duration]");
+        return sb.toString();
+    }
+
+    private static String fmt(int s) { return (s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60); }
 
     public static int coverVersion() { return coverVersion; }
     public static int[] coverPixels() { return coverPixels; }
@@ -93,7 +114,7 @@ public final class NowPlaying {
                         public void run() { WebSocketClient w = ws; if (w != null && w.isOpen()) w.send("{\"op\":9}"); }
                     }, 0, hb);
                 }
-            } else if (op == 1 && o.has("d") && o.getAsJsonObject("d").has("song")) {
+            } else if (op == 1 && isTrackEvent(o) && o.has("d") && o.getAsJsonObject("d").has("song")) {
                 JsonObject d = o.getAsJsonObject("d");
                 JsonObject song = d.getAsJsonObject("song");
                 String title = str(song, "title");
@@ -111,9 +132,13 @@ public final class NowPlaying {
                 JsonElement de = song.get("duration");
                 if (de != null && !de.isJsonNull()) dur = de.getAsInt();
                 long start = 0;
+                boolean known = false;
                 String st = str(d, "startTime");
-                if (st != null) { try { start = Instant.parse(st).toEpochMilli(); } catch (Exception ignored) {} }
-                track = new Track(title == null ? "unknown" : title, sb.toString(), start, dur);
+                if (st != null) {
+                    try { start = OffsetDateTime.parse(st).toInstant().toEpochMilli(); known = true; } catch (Exception ignored) {}
+                }
+                if (!known) start = now();
+                track = new Track(title == null ? "unknown" : title, sb.toString(), start, known, dur);
 
                 String cover = coverUrl(song);
                 if (cover == null ? lastCoverUrl != null : !cover.equals(lastCoverUrl)) {
@@ -122,6 +147,11 @@ public final class NowPlaying {
                 }
             }
         } catch (Exception ignored) {}
+    }
+
+    private static boolean isTrackEvent(JsonObject o) {
+        String t = str(o, "t");
+        return t == null || t.startsWith("TRACK_UPDATE");
     }
 
     private static String str(JsonObject o, String k) {

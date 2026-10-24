@@ -8,10 +8,13 @@ import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.resources.Identifier;
 
 final class RadioHud {
     private static final int ART = 44;
+    private static boolean wasDown, dragging, resizing;
+    private static int offX, offY;
 
     private RadioHud() {}
 
@@ -21,42 +24,106 @@ final class RadioHud {
     }
 
     private static void render(GuiGraphicsExtractor g, net.minecraft.client.DeltaTracker tick) {
-        if (HudState.editing || !HudState.visible()) return;
         Minecraft mc = Minecraft.getInstance();
-        draw(g, HudState.x(mc.getWindow().getGuiScaledWidth()), HudState.y(mc.getWindow().getGuiScaledHeight()));
+        boolean chat = mc.screen instanceof ChatScreen;
+        if (!chat) {
+            dragging = false;
+            resizing = false;
+            wasDown = false;
+        }
+        if (!HudState.enabled || !(chat || HudState.visible())) return;
+        var win = mc.getWindow();
+        int sw = win.getGuiScaledWidth(), sh = win.getGuiScaledHeight();
+        if (chat) interact(mc, win, sw, sh);
+        int x = HudState.x(sw), y = HudState.y(sh);
+        draw(g, x, y);
+        if (chat) decorate(g, mc.font, x, y);
+    }
+
+    private static void interact(Minecraft mc, com.mojang.blaze3d.platform.Window win, int sw, int sh) {
+        double mx = mc.mouseHandler.xpos() * win.getGuiScaledWidth() / (double) win.getScreenWidth();
+        double my = mc.mouseHandler.ypos() * win.getGuiScaledHeight() / (double) win.getScreenHeight();
+        int x = HudState.x(sw), y = HudState.y(sh), w = HudState.scaledW(), h = HudState.scaledH();
+        boolean down = mc.mouseHandler.isLeftPressed();
+        if (down && !wasDown) {
+            if (mx >= x + w - 10 && mx < x + w && my >= y + h - 10 && my < y + h) {
+                resizing = true;
+            } else if (mx >= x && mx < x + w && my >= y && my < y + h) {
+                dragging = true;
+                offX = (int) mx - x;
+                offY = (int) my - y;
+            }
+        }
+        if (!down && (dragging || resizing)) {
+            dragging = false;
+            resizing = false;
+            HudState.save(RadioMod.cfg());
+        }
+        wasDown = down;
+        if (dragging) HudState.setPos((int) mx - offX, (int) my - offY, sw, sh);
+        else if (resizing) HudState.setScale((mx - x) / HudState.WIDTH, sw, sh);
+    }
+
+    private static void decorate(GuiGraphicsExtractor g, Font font, int x, int y) {
+        int w = HudState.scaledW(), h = HudState.scaledH();
+        int c = (dragging || resizing) ? 0xFFFFFFFF : 0xFF8888FF;
+        g.fill(x - 1, y - 1, x + w + 1, y, c);
+        g.fill(x - 1, y + h, x + w + 1, y + h + 1, c);
+        g.fill(x - 1, y, x, y + h, c);
+        g.fill(x + w, y, x + w + 1, y + h, c);
+        g.fill(x + w - 8, y + h - 8, x + w, y + h, c);
+        g.text(font, "drag to move, corner to scale", x, y >= 12 ? y - 11 : y + h + 3, 0xFFCCCCCC);
     }
 
     static void draw(GuiGraphicsExtractor g, int x, int y) {
+        float s = (float) HudState.scale;
+        g.pose().pushMatrix();
+        g.pose().translate((float) x, (float) y);
+        g.pose().scale(s, s);
+        body(g);
+        g.pose().popMatrix();
+    }
+
+    private static void body(GuiGraphicsExtractor g) {
         Font font = Minecraft.getInstance().font;
-        int w = HudState.WIDTH, h = HudState.HEIGHT;
-        g.fill(x, y, x + w, y + h, 0xB0181818);
+        int w = HudState.WIDTH, h = HudState.height();
+        g.fill(0, 0, w, h, 0xB0181818);
 
-        int ax = x + 8, ay = y + 8;
-        if (!RadioCover.draw(g, ax, ay, ART)) g.fill(ax, ay, ax + ART, ay + ART, 0xFF000000);
+        int tx = 8;
+        if (HudState.showCover) {
+            if (!RadioCover.draw(g, 8, 8, ART)) g.fill(8, 8, 8 + ART, 8 + ART, 0xFF000000);
+            tx = 8 + ART + 10;
+        }
+        String title = font.plainSubstrByWidth(HudState.title(), w - 8 - tx);
+        g.text(font, title, tx, 10, 0xFFFFFFFF);
 
-        int tx = ax + ART + 10;
-        String title = font.plainSubstrByWidth(HudState.title(), x + w - 8 - tx);
-        g.text(font, title, tx, y + 10, 0xFFFFFFFF);
+        if (HudState.showButtons) {
+            boolean paused = RadioPlayer.isPaused();
+            int on = 0xFFFFFFFF, off = 0xFF666666, hint = 0xFFAAAAAA;
+            int c1 = tx + 14, c2 = tx + 54, c3 = tx + 116;
+            centered(g, font, RadioKeys.pause(), c1, 25, hint);
+            centered(g, font, RadioKeys.play(), c2, 25, hint);
+            centered(g, font, RadioKeys.next(), c3, 25, hint);
+            pauseIcon(g, c1, 36, paused ? on : off);
+            playIcon(g, c2, 36, paused ? off : on);
+            centered(g, font, RadioPlayer.station(), c3, 37, on);
+        }
 
-        boolean paused = RadioPlayer.isPaused();
-        int on = 0xFFFFFFFF, off = 0xFF666666, hint = 0xFFAAAAAA;
-        int c1 = tx + 14, c2 = tx + 54, c3 = tx + 116;
-        centered(g, font, RadioKeys.pause(), c1, y + 25, hint);
-        centered(g, font, RadioKeys.play(), c2, y + 25, hint);
-        centered(g, font, RadioKeys.next(), c3, y + 25, hint);
-        pauseIcon(g, c1, y + 36, paused ? on : off);
-        playIcon(g, c2, y + 36, paused ? off : on);
-        centered(g, font, RadioPlayer.station(), c3, y + 37, on);
-
-        int elapsed = NowPlaying.elapsedSec(), total = NowPlaying.durationSec();
-        String left = time(elapsed), right = time(total);
-        int reserve = font.width("00:00");
-        int ty = y + h - 14;
-        g.text(font, left, x + 8, ty, 0xFFCCCCCC);
-        g.text(font, right, x + w - 8 - font.width(right), ty, 0xFFCCCCCC);
-        int bx0 = x + 8 + reserve + 4, bx1 = x + w - 8 - reserve - 4, by = ty + 3;
-        g.fill(bx0, by, bx1, by + 2, 0x55FFFFFF);
-        if (total > 0) g.fill(bx0, by, bx0 + (int) ((bx1 - bx0) * (elapsed / (double) total)), by + 2, 0xFFFFFFFF);
+        if (HudState.showProgress) {
+            long ms = NowPlaying.elapsedMs();
+            int total = NowPlaying.durationSec();
+            String left = time((int) (ms / 1000)), right = time(total);
+            int reserve = font.width("00:00");
+            int ty = h - 14;
+            g.text(font, left, 8, ty, 0xFFCCCCCC);
+            g.text(font, right, w - 8 - font.width(right), ty, 0xFFCCCCCC);
+            int bx0 = 8 + reserve + 4, bx1 = w - 8 - reserve - 4, by = ty + 3;
+            g.fill(bx0, by, bx1, by + 2, 0x55FFFFFF);
+            if (total > 0) {
+                double frac = Math.min(1.0, ms / (total * 1000.0));
+                g.fill(bx0, by, bx0 + (int) ((bx1 - bx0) * frac), by + 2, 0xFFFFFFFF);
+            }
+        }
     }
 
     private static void centered(GuiGraphicsExtractor g, Font f, String s, int cx, int y, int color) {
