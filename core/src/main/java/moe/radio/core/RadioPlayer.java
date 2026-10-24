@@ -12,12 +12,14 @@ import javazoom.jl.decoder.Decoder;
 import javazoom.jl.decoder.Header;
 import javazoom.jl.decoder.SampleBuffer;
 
-/** Streams the song (MP3) from listen.moe and plays it locally. */
 public final class RadioPlayer {
     public static final String JPOP = "https://listen.moe/fallback";
     public static final String KPOP = "https://listen.moe/kpop/fallback";
 
     private static volatile boolean running;
+    private static volatile boolean paused;
+    private static volatile int gen;
+    private static volatile String lastUrl;
     private static volatile float volume = 0.5f;
     private static volatile SourceDataLine line;
     private static volatile int lineRate, lineCh;
@@ -25,34 +27,63 @@ public final class RadioPlayer {
     private RadioPlayer() {}
 
     public static synchronized void play(final String url) {
-        stop();
+        halt();
+        lastUrl = url;
+        paused = false;
         running = true;
-        Thread t = new Thread(new Runnable() { public void run() { loop(url); } }, "listenmoe-audio");
+        final int g = ++gen;
+        Thread t = new Thread(new Runnable() { public void run() { loop(url, g); } }, "listenmoe-audio");
         t.setDaemon(true);
         t.start();
         NowPlaying.connect(url.contains("kpop"));
     }
 
-    public static synchronized void stop() {
-        running = false;
-        NowPlaying.disconnect();
-        closeLine();
+    public static synchronized void pause() {
+        if (!running) return;
+        halt();
+        paused = true;
     }
 
+    public static synchronized void resume() {
+        if (!running) play(lastUrl != null ? lastUrl : JPOP);
+    }
+
+    public static synchronized void stop() {
+        halt();
+        paused = false;
+        NowPlaying.disconnect();
+    }
+
+    public static synchronized String switchStation() {
+        play(KPOP.equals(lastUrl) ? JPOP : KPOP);
+        return station();
+    }
+
+    public static String station() { return KPOP.equals(lastUrl) ? "K-POP" : "J-POP"; }
     public static boolean isPlaying() { return running; }
+    public static boolean isPaused() { return paused; }
     public static int getVolume() { return Math.round(volume * 100); }
     public static void setVolume(int percent) { volume = Math.max(0, Math.min(100, percent)) / 100f; }
 
-    private static void loop(String url) {
-        while (running) {
+    private static void halt() {
+        running = false;
+        gen++;
+        closeLine();
+    }
+
+    private static boolean alive(int g) { return running && gen == g; }
+
+    private static void loop(String url, int g) {
+        while (alive(g)) {
             try (InputStream in = open(url)) {
-                decode(in);
+                decode(in, g);
+                if (alive(g)) Thread.sleep(500);
             } catch (Exception e) {
-                if (!running) break;
+                if (!alive(g)) break;
                 try { Thread.sleep(3000); } catch (InterruptedException ie) { break; }
             }
         }
-        closeLine();
+        if (gen == g) closeLine();
     }
 
     private static InputStream open(String url) throws Exception {
@@ -63,13 +94,14 @@ public final class RadioPlayer {
         return new BufferedInputStream(c.getInputStream(), 65536);
     }
 
-    private static void decode(InputStream in) throws Exception {
+    private static void decode(InputStream in, int g) throws Exception {
         Bitstream bs = new Bitstream(in);
         Decoder dec = new Decoder();
-        while (running) {
+        while (alive(g)) {
             Header h = bs.readFrame();
             if (h == null) break;
             SampleBuffer sb = (SampleBuffer) dec.decodeFrame(h, bs);
+            if (!alive(g)) break;
             ensureLine(sb.getSampleFrequency(), sb.getChannelCount());
             short[] s = sb.getBuffer();
             int n = sb.getBufferLength();
@@ -92,7 +124,7 @@ public final class RadioPlayer {
         closeLine();
         AudioFormat fmt = new AudioFormat(rate, 16, ch, true, false);
         SourceDataLine l = AudioSystem.getSourceDataLine(fmt);
-        l.open(fmt, rate * ch * 2); // ~0.5s buffer
+        l.open(fmt, rate * ch * 2);
         l.start();
         line = l; lineRate = rate; lineCh = ch;
     }

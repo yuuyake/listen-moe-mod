@@ -14,26 +14,34 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 
-/** Mojang mappings */
 public class RadioMod implements ClientModInitializer {
     private static Path cfg;
+
+    static Path cfg() { return cfg; }
 
     @Override
     public void onInitializeClient() {
         cfg = FabricLoader.getInstance().getConfigDir().resolve("listenmoe.properties");
         HudState.load(cfg);
         RadioHud.register();
+        RadioKeys.init();
 
         LiteralArgumentBuilder<FabricClientCommandSource> hud = literal("hud").executes(c -> {
             HudState.enabled = !HudState.enabled;
             HudState.save(cfg);
             return msg(c, "HUD " + (HudState.enabled ? "on" : "off"));
         });
+        hud.then(literal("edit").executes(c -> {
+            Minecraft mc = Minecraft.getInstance();
+            mc.execute(() -> mc.setScreen(new HudEditScreen()));
+            return 1;
+        }));
         for (HudState.Corner k : HudState.Corner.values()) {
             hud.then(literal(k.arg).executes(c -> {
-                HudState.corner = k;
+                HudState.setCorner(k);
                 HudState.enabled = true;
                 HudState.save(cfg);
                 return msg(c, "HUD position: " + k.arg);

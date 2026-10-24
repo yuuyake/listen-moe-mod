@@ -1,12 +1,13 @@
-plugins { id 'fabric-loom' version '1.16-SNAPSHOT' }
+plugins { id 'net.fabricmc.fabric-loom-remap' version '1.16-SNAPSHOT' }
 version = '1.0.0'
 repositories { mavenCentral() }
 sourceSets { main { java { srcDirs '../core/src/main/java', '../shared/src/main/java' } } }
 dependencies {
     minecraft "com.mojang:minecraft:1.21.11"
-    
-    implementation "net.fabricmc:fabric-loader:0.19.2"
-    implementation "net.fabricmc.fabric-api:fabric-api:0.141.0+1.21.11"
+    mappings loom.officialMojangMappings()
+
+    modImplementation "net.fabricmc:fabric-loader:0.19.2"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:0.141.0+1.21.11"
     implementation 'javazoom:jlayer:1.0.1'
     implementation 'org.java-websocket:Java-WebSocket:1.5.7'
     include 'javazoom:jlayer:1.0.1'
