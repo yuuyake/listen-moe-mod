@@ -10,7 +10,7 @@ import java.util.TimerTask;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
-/** Tracks the current song via the listen.moe websocket gateway. */
+/** Tracks the current song playing. */
 public final class NowPlaying {
     private static volatile String current = "unknown";
     private static WebSocketClient ws;
