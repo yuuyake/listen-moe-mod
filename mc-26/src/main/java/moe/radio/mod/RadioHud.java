@@ -8,7 +8,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.resources.Identifier;
 
-/** Now-playing overlay, top-left. Toggle with /radio hud. */
+/** radio hud */
 final class RadioHud {
     private RadioHud() {}
 
