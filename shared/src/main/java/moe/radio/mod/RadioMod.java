@@ -40,6 +40,7 @@ public class RadioMod implements ClientModInitializer {
         hud.then(flag("buttons", () -> HudState.showButtons, v -> HudState.showButtons = v));
         hud.then(flag("cover", () -> HudState.showCover, v -> HudState.showCover = v));
         hud.then(flag("progress", () -> HudState.showProgress, v -> HudState.showProgress = v));
+        hud.then(flag("lyrics", () -> HudState.showLyrics, v -> HudState.showLyrics = v));
         hud.then(literal("scale").then(argument("percent", IntegerArgumentType.integer(50, 200)).executes(c -> {
             int p = IntegerArgumentType.getInteger(c, "percent");
             Minecraft mc = Minecraft.getInstance();
@@ -70,6 +71,13 @@ public class RadioMod implements ClientModInitializer {
                 .then(hud)
                 .then(literal("np").executes(c -> msg(c, "Now playing: " + NowPlaying.describe())))
                 .then(literal("raw").executes(c -> msg(c, NowPlaying.lastRaw())))
+                .then(literal("lyrics").then(literal("offset")
+                    .executes(c -> msg(c, "Lyrics offset: " + HudState.lyricsOffsetMs + " ms"))
+                    .then(argument("ms", IntegerArgumentType.integer(-15000, 15000)).executes(c -> {
+                        HudState.lyricsOffsetMs = IntegerArgumentType.getInteger(c, "ms");
+                        HudState.save(cfg);
+                        return msg(c, "Lyrics offset: " + HudState.lyricsOffsetMs + " ms");
+                    }))))
                 .then(literal("volume")
                     .executes(c -> msg(c, "Volume: " + RadioPlayer.getVolume()))
                     .then(argument("percent", IntegerArgumentType.integer(0, 100)).executes(c -> {

@@ -1,7 +1,28 @@
 {
-  "schemaVersion": 1, "id": "listenmoe", "version": "1.0.0", "name": "ListenMoe Radio",
-  "description": "Plays listen.moe in-game (client side). Use /radio.",
+  "schemaVersion": 1,
+  "id": "listenmoe",
+  "version": "1.0.0",
+  "name": "ListenMoe Radio",
+  "description": "Plays LISTEN.moe radio in-game with a movable player HUD. Client side only. Use /radio.",
+  "authors": [
+    "yuuyake"
+  ],
+  "contact": {
+    "sources": "https://github.com/yuuyake/listen-moe-mod",
+    "issues": "https://github.com/yuuyake/listen-moe-mod/issues"
+  },
+  "license": "MIT",
+  "icon": "assets/listenmoe/icon.png",
   "environment": "client",
-  "entrypoints": { "client": ["moe.radio.mod.RadioMod"] },
-  "depends": { "fabricloader": ">=0.15.0", "minecraft": ">=26.1", "java": ">=25", "fabric-api": "*" }
+  "entrypoints": {
+    "client": [
+      "moe.radio.mod.RadioMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": ">=26.1",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
 }

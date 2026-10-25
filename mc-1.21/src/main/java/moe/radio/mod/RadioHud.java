@@ -118,7 +118,7 @@ final class RadioHud {
             int total = NowPlaying.durationSec();
             String left = time((int) (ms / 1000)), right = time(total);
             int reserve = font.width("00:00");
-            int ty = h - 14;
+            int ty = HudState.progressY();
             g.drawString(font, left, 8, ty, 0xFFCCCCCC);
             g.drawString(font, right, w - 8 - font.width(right), ty, 0xFFCCCCCC);
             int bx0 = 8 + reserve + 4, bx1 = w - 8 - reserve - 4, by = ty + 3;
@@ -127,6 +127,11 @@ final class RadioHud {
                 double frac = Math.min(1.0, ms / (total * 1000.0));
                 g.fill(bx0, by, bx0 + (int) ((bx1 - bx0) * frac), by + 2, 0xFFFFFFFF);
             }
+        }
+
+        if (HudState.lyricsVisible()) {
+            String ly = font.plainSubstrByWidth(HudState.lyricsText(), w - 16);
+            centered(g, font, ly, w / 2, HudState.lyricsY(), 0xFFFFD6EA);
         }
     }
 

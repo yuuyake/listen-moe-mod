@@ -95,6 +95,7 @@ public final class NowPlaying {
         track = null;
         lastCoverUrl = null;
         coverInit = false;
+        Lyrics.clear();
         setCover(null, ++seq, COVER_LOADING);
         try {
             URI uri = new URI(kpop ? "wss://listen.moe/kpop/gateway_v2" : "wss://listen.moe/gateway_v2");
@@ -131,12 +132,14 @@ public final class NowPlaying {
                 JsonObject d = o.getAsJsonObject("d");
                 JsonObject song = d.getAsJsonObject("song");
                 String title = str(song, "title");
+                String firstArtist = null;
                 StringBuilder sb = new StringBuilder();
                 JsonElement ar = song.get("artists");
                 if (ar != null && ar.isJsonArray()) {
                     for (JsonElement a : (JsonArray) ar) {
                         String n = str(a.getAsJsonObject(), "name");
                         if (n == null) continue;
+                        if (firstArtist == null) firstArtist = n;
                         if (sb.length() > 0) sb.append(", ");
                         sb.append(n);
                     }
@@ -158,7 +161,12 @@ public final class NowPlaying {
                     if (el < -3000 || el > dur * 1000L + 3000) known = false;
                 }
                 if (!known) start = arrival;
-                track = new Track(title == null ? "unknown" : title, sb.toString(), start, known, dur);
+                Track prev = track;
+                Track nt = new Track(title == null ? "unknown" : title, sb.toString(), start, known, dur);
+                track = nt;
+                if (prev == null || !prev.title.equals(nt.title) || !prev.artist.equals(nt.artist)) {
+                    Lyrics.load(firstArtist == null ? "" : firstArtist, nt.title, firstName(song, "albums"), dur);
+                }
 
                 String cover = coverUrl(song);
                 boolean changed = !coverInit || (cover == null ? lastCoverUrl != null : !cover.equals(lastCoverUrl));
@@ -183,6 +191,17 @@ public final class NowPlaying {
             if (!e.isJsonObject()) continue;
             String img = str(e.getAsJsonObject(), "image");
             if (img != null && !img.isEmpty()) return img;
+        }
+        return null;
+    }
+
+    private static String firstName(JsonObject song, String key) {
+        JsonElement arr = song.get(key);
+        if (arr == null || !arr.isJsonArray()) return null;
+        for (JsonElement e : (JsonArray) arr) {
+            if (!e.isJsonObject()) continue;
+            String n = str(e.getAsJsonObject(), "name");
+            if (n != null && !n.isEmpty()) return n;
         }
         return null;
     }

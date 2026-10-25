@@ -1,0 +1,17 @@
+plugins { id 'net.fabricmc.fabric-loom-remap' version '1.16-SNAPSHOT' }
+version = '1.0.0'
+base { archivesName = 'listenmoe-radio-mc1.21.1' }
+repositories { mavenCentral() }
+sourceSets { main { java { srcDirs '../core/src/main/java', '../shared/src/main/java' } } }
+dependencies {
+    minecraft "com.mojang:minecraft:1.21.1"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:0.19.2"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:0.102.0+1.21.1"
+    implementation 'javazoom:jlayer:1.0.1'
+    implementation 'org.java-websocket:Java-WebSocket:1.5.7'
+    include 'javazoom:jlayer:1.0.1'
+    include 'org.java-websocket:Java-WebSocket:1.5.7'
+}
+tasks.withType(JavaCompile).configureEach { options.release = 21 }
+java { sourceCompatibility = JavaVersion.toVersion(21); targetCompatibility = JavaVersion.toVersion(21) }

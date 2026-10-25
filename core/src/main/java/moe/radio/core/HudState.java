@@ -21,6 +21,8 @@ public final class HudState {
     public static volatile boolean showButtons = true;
     public static volatile boolean showCover = true;
     public static volatile boolean showProgress = true;
+    public static volatile boolean showLyrics = true;
+    public static volatile int lyricsOffsetMs = 0;
     public static volatile double fx = 0, fy = 0;
     public static volatile double scale = 1.0;
 
@@ -40,9 +42,29 @@ public final class HudState {
         return idle || NowPlaying.coverState() != NowPlaying.COVER_NONE;
     }
 
+    private static int body() { return Math.max(coverVisible() ? 44 : 0, showButtons ? 38 : 10); }
+
+    public static int progressY() { return 8 + body() + 6; }
+
+    public static int lyricsY() { return showProgress ? progressY() + 12 : 8 + body() + 6; }
+
+    public static boolean lyricsVisible() {
+        if (!showLyrics) return false;
+        boolean idle = !(RadioPlayer.isPlaying() || RadioPlayer.isPaused());
+        return idle || Lyrics.available();
+    }
+
+    public static String lyricsText() {
+        boolean idle = !(RadioPlayer.isPlaying() || RadioPlayer.isPaused());
+        return idle ? "lyrics appear here" : Lyrics.line(NowPlaying.elapsedMs());
+    }
+
     public static int height() {
-        int body = Math.max(coverVisible() ? 44 : 0, showButtons ? 38 : 10);
-        return 8 + body + (showProgress ? 20 : 8);
+        int end = 8 + body();
+        boolean extra = false;
+        if (showProgress) { end = progressY() + 8; extra = true; }
+        if (lyricsVisible()) { end = lyricsY() + 8; extra = true; }
+        return end + (extra ? 6 : 8);
     }
 
     public static int scaledW() { return (int) Math.round(WIDTH * scale); }
@@ -66,7 +88,7 @@ public final class HudState {
 
     public static void reset() {
         fx = 0; fy = 0; scale = 1.0;
-        enabled = true; showButtons = true; showCover = true; showProgress = true;
+        enabled = true; showButtons = true; showCover = true; showProgress = true; showLyrics = true;
     }
 
     private static double clamp(double v) { return Math.max(0, Math.min(1, v)); }
@@ -84,6 +106,8 @@ public final class HudState {
             showButtons = Boolean.parseBoolean(p.getProperty("buttons", "true"));
             showCover = Boolean.parseBoolean(p.getProperty("cover", "true"));
             showProgress = Boolean.parseBoolean(p.getProperty("progress", "true"));
+            showLyrics = Boolean.parseBoolean(p.getProperty("lyrics", "true"));
+            lyricsOffsetMs = (int) num(p, "lyricsOffset", 0);
             fx = clamp(num(p, "x", 0));
             fy = clamp(num(p, "y", 0));
             scale = Math.max(0.5, Math.min(2.0, num(p, "scale", 1.0)));
@@ -97,6 +121,8 @@ public final class HudState {
         p.setProperty("buttons", String.valueOf(showButtons));
         p.setProperty("cover", String.valueOf(showCover));
         p.setProperty("progress", String.valueOf(showProgress));
+        p.setProperty("lyrics", String.valueOf(showLyrics));
+        p.setProperty("lyricsOffset", String.valueOf(lyricsOffsetMs));
         p.setProperty("x", String.valueOf(fx));
         p.setProperty("y", String.valueOf(fy));
         p.setProperty("scale", String.valueOf(scale));
